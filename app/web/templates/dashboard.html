@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="grid two" style="margin-bottom:20px;">
+  <!-- Quick Launch -->
+  <div class="panel">
+    <h2>Quick Launch</h2>
+    <p class="note">Select a suite, environment, and number of concurrent users to start a run.</p>
+    {% if suites %}
+    <form method="post" id="quick-launch-form" action="/quick-launch">
+      <div class="form-row">
+        <label>Suite</label>
+        <select name="suite_id" required>
+          <option value="">— select suite —</option>
+          {% for s in suites %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Environment</label>
+        <select name="env" required>
+          {% for key, cfg in environments.items() %}
+            <option value="{{ key }}">{{ cfg.label }} ({{ key }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Concurrent Users</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="range" name="num_users" id="user-slider" min="1" max="10" value="1" style="flex:1;" />
+          <span id="user-count" class="badge" style="min-width:36px;text-align:center;">1</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Notes (optional)</label>
+        <input type="text" name="notes" placeholder="e.g. regression after deploy v2.3" />
+      </div>
+      <button type="submit" class="primary action-btn" style="margin-top:4px;">▶ Run Suite</button>
+    </form>
+    {% else %}
+    <div class="note">No suites yet. <a href="/suites">Create one →</a></div>
+    {% endif %}
+  </div>
+
+  <!-- Recent Runs -->
+  <div class="panel">
+    <h2>Recent Runs</h2>
+    {% if recent_runs %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Suite</th>
+          <th>Env</th>
+          <th>Users</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in recent_runs %}
+        <tr>
+          <td><a href="/runs/{{ r.id }}">#{{ r.id }}</a></td>
+          <td><a href="/suites/{{ r.suite_id }}">{{ r.suite_name }}</a></td>
+          <td><span class="env-badge env-{{ r.env }}">{{ r.env }}</span></td>
+          <td>{{ r.num_users }}</td>
+          <td>
+            {% if r.status == 'running' %}
+              <span class="badge running">Running <span class="spinner"></span></span>
+            {% elif r.status == 'complete' %}
+              <span class="badge success">Complete</span>
+            {% elif r.status == 'error' %}
+              <span class="badge error">Error</span>
+            {% elif r.status == 'canceled' %}
+              <span class="badge canceled">Canceled</span>
+            {% else %}
+              <span class="badge">{{ r.status }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div style="margin-top:10px;"><a href="/runs" class="note">View all runs →</a></div>
+    {% else %}
+    <div class="note">No runs yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Stats bar -->
+<div class="grid three">
+  <div class="panel stat-panel">
+    <div class="stat-number">{{ suites | length }}</div>
+    <div class="stat-label">Suites</div>
+  </div>
+  <div class="panel stat-panel">
+    <div class="stat-number">{{ recent_runs | length }}</div>
+    <div class="stat-label">Recent Runs</div>
+  </div>
+  <div class="panel stat-panel">
+    <div class="stat-number">{{ recent_runs | selectattr('status', 'eq', 'complete') | list | length }}</div>
+    <div class="stat-label">Completed</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Quick-launch form: quick run from suites page
+  const form = document.getElementById('quick-launch-form');
+  if (form) {
+    form.action = '#';
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const suiteId = form.querySelector('[name="suite_id"]').value;
+      if (!suiteId) return;
+      form.action = '/suites/' + suiteId + '/run';
+      form.submit();
+    });
+  }
+
+  // User slider display
+  const slider = document.getElementById('user-slider');
+  const counter = document.getElementById('user-count');
+  if (slider && counter) {
+    slider.addEventListener('input', () => { counter.textContent = slider.value; });
+  }
+</script>
+{% endblock %}

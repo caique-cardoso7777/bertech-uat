@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "BerTech UAT" }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header>
+      <div class="header-brand">
+        <a href="/" class="brand-link">
+          <span class="brand-dot"></span>
+          <strong>BerTech UAT</strong>
+        </a>
+        <div class="note">Playwright Suite Runner</div>
+      </div>
+      <nav>
+        <a href="/"          class="{% if nav == 'dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="/suites"    class="{% if nav == 'suites' %}active{% endif %}">Suites</a>
+        <a href="/runs"      class="{% if nav == 'runs' %}active{% endif %}">Runs</a>
+        <a href="/analytics" class="{% if nav == 'analytics' %}active{% endif %}">Analytics</a>
+        <a href="/compare"   class="{% if nav == 'compare' %}active{% endif %}">Compare</a>
+        <a href="/latency"   class="{% if nav == 'latency' %}active{% endif %}">Latency</a>
+      </nav>
+    </header>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

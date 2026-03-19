@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Suites</h1>
+
+<div class="panel">
+  <table class="table">
+    <thead>
+      <tr>
+        <th style="width:40px;">ID</th>
+        <th>Name</th>
+        <th>Description</th>
+        <th style="width:80px;">Scenarios</th>
+        <th style="width:60px;">Runs</th>
+        <th style="width:100px;">Last Status</th>
+        <th style="width:220px;">Run</th>
+        <th style="width:70px;">View</th>
+        <th style="width:70px;">Delete</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in suites %}
+      <tr>
+        <td class="note">{{ s.id }}</td>
+        <td><a href="/suites/{{ s.id }}">{{ s.name }}</a></td>
+        <td class="note">{{ s.description or "" }}</td>
+        <td class="note">{{ s.scenario_count or 0 }}</td>
+        <td class="note">{{ s.run_count or 0 }}</td>
+        <td>
+          {% if s.last_run_status == 'running' %}
+            <span class="badge running">Running <span class="spinner"></span></span>
+          {% elif s.last_run_status == 'complete' %}
+            <span class="badge success">Complete</span>
+          {% elif s.last_run_status == 'error' %}
+            <span class="badge error">Error</span>
+          {% elif s.last_run_status %}
+            <span class="badge">{{ s.last_run_status }}</span>
+          {% else %}
+            <span class="note">—</span>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="/suites/{{ s.id }}/run" class="inline-form">
+            <select name="env" class="env-select" required>
+              {% for key, cfg in environments.items() %}
+                <option value="{{ key }}">{{ key }}</option>
+              {% endfor %}
+            </select>
+            <input type="number" name="num_users" value="1" min="1" max="10" style="width:52px;" title="Concurrent users" />
+            <button type="submit" class="secondary action-btn" {% if s.scenario_count == 0 %}disabled title="Add scenarios first"{% endif %}>▶ Run</button>
+          </form>
+        </td>
+        <td><a href="/suites/{{ s.id }}"><button class="action-btn">View</button></a></td>
+        <td>
+          <form method="post" action="/suites/{{ s.id }}/delete" onsubmit="return confirm('Delete suite "{{ s.name }}" and all its data?');">
+            <button type="submit" class="danger action-btn">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+
+      <!-- Add new suite row -->
+      <tr>
+        <td class="note">new</td>
+        <td><input type="text" name="name" form="add-suite-form" placeholder="Suite name" required /></td>
+        <td><input type="text" name="description" form="add-suite-form" placeholder="Description (optional)" /></td>
+        <td></td><td></td><td></td>
+        <td>
+          <form id="add-suite-form" method="post" action="/suites">
+            <button type="submit" class="primary action-btn">Add</button>
+          </form>
+        </td>
+        <td></td><td></td>
+      </tr>
+    </tbody>
+  </table>
+  {% if not suites %}
+  <div class="note" style="padding:12px 0;">No suites yet — add one above.</div>
+  {% endif %}
+</div>
+{% endblock %}

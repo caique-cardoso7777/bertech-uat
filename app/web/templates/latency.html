@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <h1 style="margin:0;">Site Latency</h1>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <!-- Env switcher -->
+    <div style="display:flex;gap:6px;">
+      {% for key, cfg in envs.items() %}
+      <a href="/latency?env={{ key }}"
+         class="badge {% if key == active_env %}running{% endif %}"
+         style="text-decoration:none;padding:4px 12px;border-radius:4px;font-size:12px;">
+        {{ cfg.label }}
+      </a>
+      {% endfor %}
+    </div>
+    <!-- Re-check button -->
+    <form method="post" action="/latency/check?env={{ active_env }}" style="margin:0;">
+      <button type="submit" class="primary action-btn" style="padding:6px 16px;font-size:13px;">
+        ↻ Check Now
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom:16px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <span class="note">Target: <strong>{{ envs[active_env].base_url }}</strong></span>
+    <span class="note">Last checked: {{ checked_at }}</span>
+  </div>
+</div>
+
+<!-- Results table -->
+<div class="panel">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Page</th>
+        <th>URL</th>
+        <th>HTTP</th>
+        <th>Latency</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr>
+        <td><strong>{{ r.name }}</strong></td>
+        <td><span class="note" style="font-size:11px;">{{ r.url }}</span></td>
+        <td>
+          {% if r.status %}
+            <span class="badge {% if r.status < 300 %}success{% elif r.status < 400 %}running{% else %}error{% endif %}">
+              {{ r.status }}
+            </span>
+          {% else %}
+            <span class="badge error">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if r.latency_ms is not none %}
+            {% set ms = r.latency_ms %}
+            <span style="font-weight:600;color:{% if ms < 500 %}#22c55e{% elif ms < 1500 %}#f59e0b{% else %}#ef4444{% endif %};">
+              {{ ms }} ms
+            </span>
+          {% else %}
+            <span class="note">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if r.error %}
+            <span class="badge error" title="{{ r.error }}">Error</span>
+          {% elif r.ok %}
+            <span class="badge success">OK</span>
+          {% else %}
+            <span class="badge error">Fail</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Latency bar chart -->
+<div class="panel" style="margin-top:16px;">
+  <h2>Response Time <span class="note" style="font-weight:400;font-size:13px;">ms</span></h2>
+  <div style="position:relative;height:200px;">
+    <canvas id="chartLatency"></canvas>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="panel" style="margin-top:12px;font-size:12px;color:#555;">
+  <strong>Thresholds:</strong>
+  &nbsp;<span style="color:#22c55e;">●</span> &lt;500ms — Good
+  &nbsp;<span style="color:#f59e0b;">●</span> 500–1500ms — Slow
+  &nbsp;<span style="color:#ef4444;">●</span> &gt;1500ms — Critical
+  <span style="float:right;">Page auto-probes on load. Use "Check Now" to refresh.</span>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+const labels  = {{ results | map(attribute='name') | list | tojson }};
+const values  = {{ results | map(attribute='latency_ms') | list | tojson }};
+const colors  = values.map(ms =>
+  ms === null ? '#d1d5db' : ms < 500 ? '#22c55e' : ms < 1500 ? '#f59e0b' : '#ef4444'
+);
+
+new Chart(document.getElementById('chartLatency'), {
+  type: 'bar',
+  data: {
+    labels,
+    datasets: [{
+      label: 'Latency (ms)',
+      data: values,
+      backgroundColor: colors,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.raw ?? 'N/A'} ms` } }
+    },
+    scales: {
+      x: { grid: { color: 'rgba(0,0,0,0.06)' } },
+      y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.06)' },
+           ticks: { callback: v => v + 'ms' } }
+    }
+  }
+});
+</script>
+{% endblock %}

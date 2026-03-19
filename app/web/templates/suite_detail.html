@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ suite.name }}</h1>
+{% if suite.description %}
+  <p class="note">{{ suite.description }}</p>
+{% endif %}
+
+<div class="grid two" style="margin-bottom:16px;">
+
+  <!-- Scenarios panel -->
+  <div class="panel">
+    <h2>Scenarios</h2>
+    {% if scenarios %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Script</th>
+          <th style="width:60px;">Remove</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sc in scenarios %}
+        <tr>
+          <td>{{ sc.name }}</td>
+          <td class="note">{{ sc.script_key }}</td>
+          <td>
+            <form method="post" action="/suites/{{ suite.id }}/scenarios/{{ sc.id }}/delete"
+                  onsubmit="return confirm('Remove scenario {{ sc.name }}?');">
+              <button type="submit" class="danger action-btn" style="min-width:60px;">Remove</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="note">No scenarios yet. Add one below.</div>
+    {% endif %}
+
+    <!-- Add scenario -->
+    <div style="margin-top:14px;">
+      <strong>Add scenario</strong>
+      <form method="post" action="/suites/{{ suite.id }}/scenarios" class="inline-form" style="margin-top:8px;">
+        <select name="script_key" required>
+          <option value="">— select script —</option>
+          {% for sc in available_scenarios %}
+            <option value="{{ sc.key }}">{{ sc.label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="primary action-btn">Add</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Run panel -->
+  <div class="panel">
+    <h2>Run This Suite</h2>
+    {% if scenarios %}
+    <form method="post" action="/suites/{{ suite.id }}/run">
+      <div class="form-row">
+        <label>Environment</label>
+        <select name="env" required>
+          {% for key, cfg in environments.items() %}
+            <option value="{{ key }}">{{ cfg.label }} ({{ key }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Concurrent Users</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="range" name="num_users" id="user-slider" min="1" max="10" value="1" style="flex:1;" />
+          <span id="user-count" class="badge" style="min-width:36px;text-align:center;">1</span>
+        </div>
+        <div class="note" style="margin-top:4px;">
+          Each user runs in an isolated headless browser. Max 10 concurrent.
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Notes (optional)</label>
+        <input type="text" name="notes" placeholder="e.g. post-deploy check v2.3" />
+      </div>
+      <button type="submit" class="primary action-btn">▶ Start Run (Headless)</button>
+    </form>
+    {% else %}
+    <div class="note">Add at least one scenario before running.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Runs history -->
+<div class="panel">
+  <h2>Run History</h2>
+  {% if runs %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th style="width:50px;">#</th>
+        <th style="width:80px;">Env</th>
+        <th style="width:80px;">Users</th>
+        <th style="width:110px;">Status</th>
+        <th>Started</th>
+        <th>Finished</th>
+        <th style="width:60px;">View</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in runs %}
+      <tr>
+        <td class="note">{{ r.id }}</td>
+        <td><span class="env-badge env-{{ r.env }}">{{ r.env }}</span></td>
+        <td class="note">{{ r.num_users }}</td>
+        <td>
+          {% if r.status == 'running' %}
+            <span class="badge running">Running <span class="spinner"></span></span>
+          {% elif r.status == 'complete' %}
+            <span class="badge success">Complete</span>
+          {% elif r.status == 'error' %}
+            <span class="badge error">Error</span>
+          {% elif r.status == 'canceled' %}
+            <span class="badge canceled">Canceled</span>
+          {% else %}
+            <span class="badge">{{ r.status }}</span>
+          {% endif %}
+        </td>
+        <td class="note">{{ r.started_at or "—" }}</td>
+        <td class="note">{{ r.finished_at or "—" }}</td>
+        <td><a href="/runs/{{ r.id }}"><button class="action-btn">View</button></a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="note">No runs yet for this suite.</div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const slider = document.getElementById('user-slider');
+  const counter = document.getElementById('user-count');
+  if (slider && counter) {
+    slider.addEventListener('input', () => { counter.textContent = slider.value; });
+  }
+</script>
+{% endblock %}

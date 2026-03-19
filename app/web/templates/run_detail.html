@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px;">
+  <h1 style="margin:0;">Run #{{ run.id }}</h1>
+  {% if run.status == 'running' %}
+    <span class="badge running">Running <span class="spinner"></span></span>
+  {% elif run.status == 'complete' %}
+    <span class="badge success">Complete</span>
+  {% elif run.status == 'error' %}
+    <span class="badge error">Error</span>
+  {% elif run.status == 'canceled' %}
+    <span class="badge canceled">Canceled</span>
+  {% else %}
+    <span class="badge">{{ run.status }}</span>
+  {% endif %}
+</div>
+<div class="note" style="margin-bottom:16px;">
+  Suite: <a href="/suites/{{ run.suite_id }}">{{ suite.name or run.suite_id }}</a>
+  &nbsp;·&nbsp; Env: <span class="env-badge env-{{ run.env }}">{{ run.env }}</span>
+  &nbsp;·&nbsp; Users: <strong>{{ run.num_users }}</strong>
+</div>
+
+<!-- Run meta + actions -->
+<div class="grid two" style="margin-bottom:16px;">
+  <div class="panel">
+    <div><strong>Started:</strong> {{ run.started_at_display }}</div>
+    <div><strong>Finished:</strong> {{ run.finished_at_display }}</div>
+    {% if run.notes %}<div><strong>Notes:</strong> {{ run.notes }}</div>{% endif %}
+  </div>
+  <div class="panel">
+    <!-- Stats pill row -->
+    <div class="stat-row">
+      <span class="stat-pill pass">✓ {{ stats.passed }} passed</span>
+      {% if stats.warned > 0 %}
+        <span class="stat-pill warn">⚠ {{ stats.warned }} warn</span>
+      {% endif %}
+      {% if stats.failed > 0 %}
+        <span class="stat-pill fail">✗ {{ stats.failed }} failed</span>
+      {% endif %}
+      <span class="stat-pill neutral">{{ stats.total }} total</span>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="/runs/{{ run.id }}/report" target="_blank"><button class="primary action-btn">📄 Report</button></a>
+      <a href="/runs/{{ run.id }}/export"><button class="secondary action-btn">↓ JSON</button></a>
+      <a href="/compare?a={{ run.id }}"><button class="secondary action-btn">⇄ Compare</button></a>
+      {% if run.status == 'running' %}
+        <form method="post" action="/runs/{{ run.id }}/cancel">
+          <button type="submit" class="danger action-btn">Stop Run</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Results pivot table: Scenario × User -->
+{% if scenarios_map %}
+<div class="panel">
+  <h2>Results</h2>
+  {% for scenario_name, user_map in scenarios_map.items() %}
+  <div style="margin-bottom:20px;">
+    <h3 style="font-size:15px;margin:0 0 10px;">{{ scenario_name }}</h3>
+    <div class="results-grid-wrap">
+      <div class="user-grid" style="grid-template-columns: repeat({{ [user_indices|length, 1]|max }}, minmax(160px, 1fr));">
+        {% for ui in user_indices %}
+        {% set res = user_map.get(ui) %}
+        <div class="user-card {% if res %}status-{{ res.status | lower }}{% else %}status-pending{% endif %}"
+             onclick="toggleSteps('steps-{{ scenario_name|replace(' ','_') }}-{{ ui }}')"
+             style="cursor:pointer;">
+          <div class="user-card-header">
+            <span class="user-label">User {{ ui + 1 }}</span>
+            {% if res %}
+              {% if res.status == 'PASS' %}
+                <span class="badge success">PASS</span>
+              {% elif res.status == 'WARN' %}
+                <span class="badge warn">WARN</span>
+              {% elif res.status in ['FAIL', 'error'] %}
+                <span class="badge error">FAIL</span>
+              {% else %}
+                <span class="badge">{{ res.status }}</span>
+              {% endif %}
+            {% else %}
+              <span class="badge queued">pending</span>
+            {% endif %}
+          </div>
+          {% if res %}
+            <div class="user-card-meta">
+              {% if res.duration_ms %}<span>{{ (res.duration_ms / 1000) | round(1) }}s</span>{% endif %}
+              {% if res.email_used %}<span class="note" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;max-width:140px;" title="{{ res.email_used }}">{{ res.email_used }}</span>{% endif %}
+            </div>
+            {% if res.errors %}
+              <div class="error-preview">⚠ {{ res.errors[0][:60] }}{% if res.errors[0]|length > 60 %}…{% endif %}</div>
+            {% endif %}
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Expandable step details per user -->
+    {% for ui in user_indices %}
+    {% set res = user_map.get(ui) %}
+    {% if res and res.steps %}
+    <div id="steps-{{ scenario_name|replace(' ','_') }}-{{ ui }}" class="steps-panel" style="display:none;">
+      <div class="steps-header">
+        User {{ ui + 1 }} — Step Details
+        <span class="note" style="font-weight:400;margin-left:8px;">
+          {{ res.email_used or "" }}
+          {% if res.screenshot_path %}
+            &nbsp;·&nbsp; <span class="note">Screenshot captured</span>
+          {% endif %}
+        </span>
+      </div>
+      <table class="table" style="font-size:13px;">
+        <thead>
+          <tr>
+            <th>Step</th>
+            <th style="width:80px;">Status</th>
+            <th style="width:80px;">Duration</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for step in res.steps %}
+          <tr class="step-row-{{ step.status | lower }}">
+            <td>{{ step.name }}</td>
+            <td>
+              {% if step.status == 'PASS' %}
+                <span class="badge success">PASS</span>
+              {% elif step.status == 'WARN' %}
+                <span class="badge warn">WARN</span>
+              {% elif step.status in ['FAIL', 'error'] %}
+                <span class="badge error">FAIL</span>
+              {% else %}
+                <span class="badge">{{ step.status }}</span>
+              {% endif %}
+            </td>
+            <td class="note">{{ step.duration_ms }}ms</td>
+            <td>
+              <ul class="step-notes">
+                {% for n in step.notes %}
+                  <li>{{ n }}</li>
+                {% endfor %}
+              </ul>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if res.errors %}
+        <div class="error-block">
+          <strong>Errors:</strong>
+          <ul>{% for e in res.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="panel">
+  {% if run.status == 'running' %}
+    <div class="note">Run is in progress — results will appear here as they complete.</div>
+  {% else %}
+    <div class="note">No results recorded for this run.</div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleSteps(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+
+  // Auto-refresh while running
+  {% if run.status in ['running', 'queued'] %}
+  (function poll() {
+    fetch('/runs/{{ run.id }}/status')
+      .then(r => r.json())
+      .then(data => {
+        if (!['running','queued'].includes(data.status)) {
+          location.reload();
+        } else {
+          setTimeout(poll, 4000);
+        }
+      })
+      .catch(() => setTimeout(poll, 6000));
+  })();
+  {% endif %}
+</script>
+{% endblock %}

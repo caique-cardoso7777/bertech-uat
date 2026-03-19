@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>All Runs</h1>
+
+<div class="panel">
+  {% if runs %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th style="width:50px;">#</th>
+        <th>Suite</th>
+        <th style="width:80px;">Env</th>
+        <th style="width:70px;">Users</th>
+        <th style="width:120px;">Status</th>
+        <th>Started</th>
+        <th>Finished</th>
+        <th style="width:60px;">Report</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in runs %}
+      <tr>
+        <td class="note">{{ r.id }}</td>
+        <td><a href="/suites/{{ r.suite_id }}">{{ r.suite_name }}</a></td>
+        <td><span class="env-badge env-{{ r.env }}">{{ r.env }}</span></td>
+        <td class="note">{{ r.num_users }}</td>
+        <td>
+          {% if r.status == 'running' %}
+            <span class="badge running">Running <span class="spinner"></span></span>
+          {% elif r.status == 'complete' %}
+            <span class="badge success">Complete</span>
+          {% elif r.status == 'error' %}
+            <span class="badge error">Error</span>
+          {% elif r.status == 'canceled' %}
+            <span class="badge canceled">Canceled</span>
+          {% elif r.status == 'queued' %}
+            <span class="badge queued">Queued</span>
+          {% else %}
+            <span class="badge">{{ r.status }}</span>
+          {% endif %}
+        </td>
+        <td class="note">{{ r.started_at_display }}</td>
+        <td class="note">{{ r.finished_at_display }}</td>
+        <td><a href="/runs/{{ r.id }}"><button class="action-btn">View</button></a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="note">No runs yet.</div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Auto-refresh if any run is active
+  const hasRunning = document.querySelector('.badge.running');
+  if (hasRunning) {
+    setTimeout(() => location.reload(), 5000);
+  }
+</script>
+{% endblock %}

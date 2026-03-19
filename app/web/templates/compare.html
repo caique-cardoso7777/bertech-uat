@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% macro badge(status) %}
+  {% if status == 'PASS' %}<span class="badge success">PASS</span>
+  {% elif status == 'WARN' %}<span class="badge warn">WARN</span>
+  {% elif status in ['FAIL','error'] %}<span class="badge error">FAIL</span>
+  {% elif status == 'SKIP' %}<span class="badge">SKIP</span>
+  {% elif status %}  <span class="badge">{{ status }}</span>
+  {% else %}<span class="note">—</span>{% endif %}
+{% endmacro %}
+
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+  <h1 style="margin:0;">Compare Runs</h1>
+</div>
+
+<!-- Run selector -->
+<div class="panel" style="margin-bottom:20px;">
+  <form method="get" action="/compare" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+    <div class="form-row" style="flex:1;min-width:160px;">
+      <label>Run A — Baseline</label>
+      <select name="a" required>
+        <option value="">— select —</option>
+        {% for r in all_runs %}
+          <option value="{{ r.id }}" {% if run_a and r.id == run_a.id %}selected{% endif %}>
+            #{{ r.id }} · {{ r.env }} · {{ (r.started_at or '')[:10] }} · {{ r.status }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-row" style="flex:1;min-width:160px;">
+      <label>Run B — Comparison</label>
+      <select name="b" required>
+        <option value="">— select —</option>
+        {% for r in all_runs %}
+          <option value="{{ r.id }}" {% if run_b and r.id == run_b.id %}selected{% endif %}>
+            #{{ r.id }} · {{ r.env }} · {{ (r.started_at or '')[:10] }} · {{ r.status }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="primary action-btn">Compare →</button>
+  </form>
+</div>
+
+{% if run_a and run_b %}
+
+<!-- Run headers -->
+<div class="grid two" style="margin-bottom:20px;">
+  {% for run, lbl in [(run_a, 'A — Baseline'), (run_b, 'B — Comparison')] %}
+  <div class="panel">
+    <h2>Run #{{ run.id }} <span class="note" style="font-weight:400;">{{ lbl }}</span></h2>
+    <div class="note" style="line-height:1.8;">
+      Env: <span class="env-badge env-{{ run.env }}">{{ run.env }}</span>
+      &nbsp;·&nbsp; Users: <strong>{{ run.num_users }}</strong><br>
+      Started: {{ (run.started_at or '')[:19].replace('T',' ') }}
+      {% if run.notes %}<br>Notes: {{ run.notes }}{% endif %}
+    </div>
+    <div class="stat-row" style="margin-top:10px;">
+      <span class="stat-pill pass">✓ {{ stats[run.id].passed }}</span>
+      <span class="stat-pill warn">⚠ {{ stats[run.id].warned }}</span>
+      <span class="stat-pill fail">✗ {{ stats[run.id].failed }}</span>
+      <span class="stat-pill neutral">{{ stats[run.id].total }} users</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Legend -->
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;">
+  <span style="background:#fff3cd;color:#664d00;padding:3px 10px;border-radius:999px;font-weight:600;">⚠ Regression</span>
+  <span style="background:#d4edda;color:#155724;padding:3px 10px;border-radius:999px;font-weight:600;">✓ Improvement</span>
+  <span class="note" style="padding:3px 0;">Avg across all users of each run</span>
+</div>
+
+<!-- Step comparison -->
+<div class="panel" style="margin-bottom:20px;">
+  <h2>Step-by-Step Comparison</h2>
+  <div style="overflow-x:auto;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="min-width:200px;">Step</th>
+          <th style="width:100px;">A (#{{ run_a.id }})</th>
+          <th style="width:100px;">B (#{{ run_b.id }})</th>
+          <th style="width:90px;">Avg ms A</th>
+          <th style="width:90px;">Avg ms B</th>
+          <th style="width:90px;">Δ ms</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in step_rows %}
+        <tr style="{% if row.regression %}background:#fffbf0;{% elif row.improvement %}background:#f3fdf6;{% endif %}">
+          <td style="font-weight:{% if row.regression or row.improvement %}600{% else %}400{% endif %};">
+            {{ row.name }}
+          </td>
+          <td>{{ badge(row.status_a) }}</td>
+          <td>{{ badge(row.status_b) }}</td>
+          <td class="note">{% if row.dur_a %}{{ row.dur_a }}{% else %}—{% endif %}</td>
+          <td class="note">{% if row.dur_b %}{{ row.dur_b }}{% else %}—{% endif %}</td>
+          <td>
+            {% if row.dur_a and row.dur_b %}
+              {% set delta = row.dur_b - row.dur_a %}
+              {% if delta > 500 %}<span style="color:#b52c1b;font-weight:600;">+{{ delta }}ms</span>
+              {% elif delta < -500 %}<span style="color:#1b7f6e;font-weight:600;">{{ delta }}ms</span>
+              {% elif delta > 0 %}<span class="note">+{{ delta }}ms</span>
+              {% elif delta < 0 %}<span class="note">{{ delta }}ms</span>
+              {% else %}<span class="note">—</span>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if row.regression %}
+              <span style="background:#fff3cd;color:#664d00;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">⚠ Regression</span>
+            {% elif row.improvement %}
+              <span style="background:#d4edda;color:#155724;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">✓ Improved</span>
+            {% else %}
+              <span class="note">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- User-level outcomes -->
+<div class="panel">
+  <h2>User Outcomes</h2>
+  <div style="overflow-x:auto;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Status A (#{{ run_a.id }})</th>
+          <th>Status B (#{{ run_b.id }})</th>
+          <th>Duration A</th>
+          <th>Duration B</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in user_rows %}
+        <tr>
+          <td>User {{ u.user_idx + 1 }}</td>
+          <td>{{ badge(u.status_a) }}</td>
+          <td>{{ badge(u.status_b) }}</td>
+          <td class="note">{% if u.dur_a %}{{ (u.dur_a/1000)|round(1) }}s{% else %}—{% endif %}</td>
+          <td class="note">{% if u.dur_b %}{{ (u.dur_b/1000)|round(1) }}s{% else %}—{% endif %}</td>
+          <td>
+            {% if u.regression %}
+              <span style="background:#fff3cd;color:#664d00;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">⚠ Regression</span>
+            {% elif u.improvement %}
+              <span style="background:#d4edda;color:#155724;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">✓ Improved</span>
+            {% else %}
+              <span class="note">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

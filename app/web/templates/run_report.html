@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Run #{{ run.id }} Report — BerTech UAT</title>
+  <style>
+    :root {
+      --blue: #1a4fa0; --orange: #e48f31;
+      --pass: #1b7f6e; --pass-bg: #dff1ea;
+      --warn: #b36a00; --warn-bg: #fff0d0;
+      --fail: #b52c1b; --fail-bg: #f6d5cc;
+      --skip: #6e665f; --skip-bg: #efe9df;
+      --border: #e3ddd2; --muted: #6e665f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Segoe UI", Arial, sans-serif; font-size: 13px; color: #1f1d1a; background: #fff; padding: 32px 40px; }
+
+    /* ── Header ── */
+    .report-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid var(--blue); }
+    .report-title { font-size: 22px; font-weight: 700; color: var(--blue); }
+    .report-meta { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.6; }
+    .logo-area { text-align: right; }
+    .logo-area .brand { font-size: 16px; font-weight: 700; color: var(--blue); }
+    .logo-area .sub { font-size: 11px; color: var(--muted); }
+
+    /* ── Summary pills ── */
+    .summary-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+    .sum-card { border-radius: 10px; padding: 12px 20px; min-width: 110px; text-align: center; border: 1px solid var(--border); }
+    .sum-card .num { font-size: 28px; font-weight: 700; line-height: 1; }
+    .sum-card .lbl { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .sum-card.pass { background: var(--pass-bg); }  .sum-card.pass .num { color: var(--pass); }
+    .sum-card.warn { background: var(--warn-bg); }  .sum-card.warn .num { color: var(--warn); }
+    .sum-card.fail { background: var(--fail-bg); }  .sum-card.fail .num { color: var(--fail); }
+    .sum-card.skip { background: var(--skip-bg); }  .sum-card.skip .num { color: var(--skip); }
+    .sum-card.neutral { background: #f6f3ee; }        .sum-card.neutral .num { color: var(--blue); }
+
+    /* ── Section title ── */
+    .section-title { font-size: 14px; font-weight: 700; color: var(--blue); margin: 28px 0 10px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+
+    /* ── User block ── */
+    .user-block { margin-bottom: 28px; page-break-inside: avoid; }
+    .user-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .user-heading h3 { font-size: 13px; font-weight: 700; }
+    .user-heading .email { font-size: 11px; color: var(--muted); }
+
+    /* ── Step table ── */
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { background: #f6f3ee; color: var(--muted); font-size: 11px; font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+    td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr.row-pass { background: #f9fefb; }
+    tr.row-warn { background: #fffdf5; }
+    tr.row-fail { background: #fff8f7; }
+    tr.row-skip { background: #fafafa; color: var(--muted); }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .badge-pass { background: var(--pass-bg); color: var(--pass); }
+    .badge-warn { background: var(--warn-bg); color: var(--warn); }
+    .badge-fail { background: var(--fail-bg); color: var(--fail); }
+    .badge-skip { background: var(--skip-bg); color: var(--skip); }
+
+    .notes-list { margin: 0; padding-left: 14px; color: var(--muted); line-height: 1.5; }
+    .notes-list li { margin-bottom: 1px; }
+
+    .dur { color: var(--muted); white-space: nowrap; }
+
+    /* ── Footer ── */
+    .report-footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
+
+    /* ── Print ── */
+    @media print {
+      body { padding: 16px 20px; }
+      .no-print { display: none !important; }
+      .user-block { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Print button (hidden on print) -->
+<div class="no-print" style="margin-bottom:20px;display:flex;gap:10px;">
+  <button onclick="window.print()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;">🖨 Print / Save as PDF</button>
+  <a href="/runs/{{ run.id }}"><button style="background:#e8e3da;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">← Back to Run</button></a>
+</div>
+
+<!-- Header -->
+<div class="report-header">
+  <div>
+    <div class="report-title">UAT Run #{{ run.id }} — {{ suite_name }}</div>
+    <div class="report-meta">
+      Environment: <strong>{{ run.env | upper }}</strong> &nbsp;·&nbsp;
+      Users: <strong>{{ run.num_users }}</strong> &nbsp;·&nbsp;
+      Started: <strong>{{ run.started_at_display }}</strong><br>
+      Finished: <strong>{{ run.finished_at_display }}</strong>
+      {% if run.notes %}&nbsp;·&nbsp; Notes: {{ run.notes }}{% endif %}
+    </div>
+  </div>
+  <div class="logo-area">
+    <div class="brand">BerTech UAT</div>
+    <div class="sub">Playwright Suite Runner</div>
+    <div class="sub" style="margin-top:4px;">Generated {{ generated_at }}</div>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="summary-row">
+  <div class="sum-card neutral"><div class="num">{{ stats.total }}</div><div class="lbl">Users</div></div>
+  <div class="sum-card pass"><div class="num">{{ stats.passed }}</div><div class="lbl">Passed</div></div>
+  <div class="sum-card warn"><div class="num">{{ stats.warned }}</div><div class="lbl">Warned</div></div>
+  <div class="sum-card fail"><div class="num">{{ stats.failed }}</div><div class="lbl">Failed</div></div>
+  {% if wall_time_sec %}<div class="sum-card neutral"><div class="num">{{ wall_time_sec }}s</div><div class="lbl">Wall Time</div></div>{% endif %}
+</div>
+
+<!-- Per-user step details -->
+<div class="section-title">Step Details — All Users</div>
+
+{% for result in results %}
+<div class="user-block">
+  <div class="user-heading">
+    <h3>User {{ result.user_idx + 1 }}</h3>
+    {% set s = result.status %}
+    {% if s == 'PASS' %}<span class="badge badge-pass">PASS</span>
+    {% elif s == 'WARN' %}<span class="badge badge-warn">WARN</span>
+    {% elif s in ['FAIL','error'] %}<span class="badge badge-fail">FAIL</span>
+    {% else %}<span class="badge badge-skip">{{ s }}</span>{% endif %}
+    {% if result.email_used %}<span class="email">{{ result.email_used }}</span>{% endif %}
+    {% if result.duration_ms %}<span class="email">{{ (result.duration_ms / 1000) | round(1) }}s total</span>{% endif %}
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:220px;">Step</th>
+        <th style="width:60px;">Status</th>
+        <th style="width:70px;">Duration</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for step in result.steps %}
+      {% set st = step.status %}
+      <tr class="row-{{ st | lower }}">
+        <td>{{ step.name }}</td>
+        <td>
+          {% if st == 'PASS' %}<span class="badge badge-pass">PASS</span>
+          {% elif st == 'WARN' %}<span class="badge badge-warn">WARN</span>
+          {% elif st in ['FAIL','error'] %}<span class="badge badge-fail">FAIL</span>
+          {% else %}<span class="badge badge-skip">{{ st }}</span>{% endif %}
+        </td>
+        <td class="dur">{% if step.duration_ms %}{{ step.duration_ms }}ms{% endif %}</td>
+        <td>
+          {% if step.notes %}
+          <ul class="notes-list">
+            {% for n in step.notes %}<li>{{ n }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if result.errors %}
+  <div style="margin-top:6px;padding:8px 10px;background:#fff4f2;border-radius:6px;border:1px solid #f0b0a0;font-size:11px;color:#8a2f1d;">
+    <strong>Errors:</strong>
+    <ul style="margin:3px 0 0;padding-left:14px;">{% for e in result.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+
+<div class="report-footer">
+  <span>BerTech UAT Runner — Playwright Automation</span>
+  <span>Run #{{ run.id }} · {{ run.env | upper }} · {{ run.num_users }} user(s)</span>
+</div>
+
+</body>
+</html>

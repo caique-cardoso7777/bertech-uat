@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# Secrets / env files
+.env
+*.env
+secrets.py
+
+# Database (runtime data — not versioned)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Reports & screenshots (generated at runtime)
+reports/screenshots/
+reports/*.pdf
+
+# Playwright
+playwright/.auth/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node (if any tooling added later)
+node_modules/

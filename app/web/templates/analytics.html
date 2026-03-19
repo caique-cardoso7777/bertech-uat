@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+  <h1 style="margin:0;">Analytics</h1>
+  <span class="note">{{ total_runs }} run{{ 's' if total_runs != 1 else '' }} recorded</span>
+</div>
+
+{% if total_runs == 0 %}
+<div class="panel" style="text-align:center;padding:40px;">
+  <p class="note">No runs yet. <a href="/">Launch a suite →</a></p>
+</div>
+{% else %}
+
+<!-- Row 1: Run outcomes + Duration trend -->
+<div class="grid two" style="margin-bottom:20px;">
+  <div class="panel">
+    <h2>Run Outcomes <span class="note" style="font-weight:400;font-size:13px;">steps per run</span></h2>
+    <div style="position:relative;height:240px;">
+      <canvas id="chartOutcomes"></canvas>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Run Duration <span class="note" style="font-weight:400;font-size:13px;">wall-clock seconds</span></h2>
+    <div style="position:relative;height:240px;">
+      <canvas id="chartDuration"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Row 2: Step pass rate -->
+<div class="panel" style="margin-bottom:20px;">
+  <h2>Step Pass Rate <span class="note" style="font-weight:400;font-size:13px;">% across all runs</span></h2>
+  <div style="position:relative;height:{{ [step_labels | length * 38, 200] | max }}px;">
+    <canvas id="chartStepRate"></canvas>
+  </div>
+</div>
+
+<!-- Row 3: Step avg latency -->
+<div class="panel" style="margin-bottom:20px;">
+  <h2>Avg Step Duration <span class="note" style="font-weight:400;font-size:13px;">milliseconds</span></h2>
+  <div style="position:relative;height:{{ [step_labels | length * 38, 200] | max }}px;">
+    <canvas id="chartStepMs"></canvas>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+const PASS_COLOR  = '#22c55e';
+const WARN_COLOR  = '#f59e0b';
+const FAIL_COLOR  = '#ef4444';
+const BLUE_COLOR  = '#1a4fa0';
+const GRID_COLOR  = 'rgba(0,0,0,0.06)';
+
+Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
+Chart.defaults.font.size   = 12;
+Chart.defaults.color       = '#555';
+
+// ── Run Outcomes ──────────────────────────────────────────────────────
+const outLabels = {{ run_labels | tojson }};
+const outPass   = {{ run_pass   | tojson }};
+const outWarn   = {{ run_warn   | tojson }};
+const outFail   = {{ run_fail   | tojson }};
+
+new Chart(document.getElementById('chartOutcomes'), {
+  type: 'bar',
+  data: {
+    labels: outLabels,
+    datasets: [
+      { label: 'PASS',  data: outPass, backgroundColor: PASS_COLOR, borderRadius: 3 },
+      { label: 'WARN',  data: outWarn, backgroundColor: WARN_COLOR, borderRadius: 3 },
+      { label: 'FAIL',  data: outFail, backgroundColor: FAIL_COLOR, borderRadius: 3 },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      x: { stacked: true, grid: { color: GRID_COLOR } },
+      y: { stacked: true, grid: { color: GRID_COLOR }, ticks: { stepSize: 1 },
+           title: { display: true, text: 'Steps' } }
+    }
+  }
+});
+
+// ── Run Duration ──────────────────────────────────────────────────────
+const durLabels = {{ run_labels   | tojson }};
+const durData   = {{ run_durations | tojson }};
+
+new Chart(document.getElementById('chartDuration'), {
+  type: 'line',
+  data: {
+    labels: durLabels,
+    datasets: [{
+      label: 'Duration (s)',
+      data: durData,
+      borderColor: BLUE_COLOR,
+      backgroundColor: 'rgba(26,79,160,0.1)',
+      fill: true,
+      tension: 0.3,
+      pointBackgroundColor: BLUE_COLOR,
+      pointRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: GRID_COLOR } },
+      y: { grid: { color: GRID_COLOR }, beginAtZero: true,
+           title: { display: true, text: 'Seconds' } }
+    }
+  }
+});
+
+// ── Step Pass Rate ────────────────────────────────────────────────────
+const stepLabels   = {{ step_labels    | tojson }};
+const stepPassPct  = {{ step_pass_pct  | tojson }};
+const stepWarnPct  = {{ step_warn_pct  | tojson }};
+const stepFailPct  = {{ step_fail_pct  | tojson }};
+
+new Chart(document.getElementById('chartStepRate'), {
+  type: 'bar',
+  data: {
+    labels: stepLabels,
+    datasets: [
+      { label: 'PASS %', data: stepPassPct, backgroundColor: PASS_COLOR, borderRadius: 3 },
+      { label: 'WARN %', data: stepWarnPct, backgroundColor: WARN_COLOR, borderRadius: 3 },
+      { label: 'FAIL %', data: stepFailPct, backgroundColor: FAIL_COLOR, borderRadius: 3 },
+    ]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'top' },
+               tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%` } } },
+    scales: {
+      x: { stacked: true, max: 100, grid: { color: GRID_COLOR },
+           ticks: { callback: v => v + '%' } },
+      y: { stacked: true, grid: { color: GRID_COLOR }, ticks: { font: { size: 11 } } }
+    }
+  }
+});
+
+// ── Avg Step Duration ─────────────────────────────────────────────────
+const stepAvgMs = {{ step_avg_ms | tojson }};
+
+new Chart(document.getElementById('chartStepMs'), {
+  type: 'bar',
+  data: {
+    labels: stepLabels,
+    datasets: [{
+      label: 'Avg ms',
+      data: stepAvgMs,
+      backgroundColor: BLUE_COLOR,
+      borderRadius: 3,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false },
+               tooltip: { callbacks: { label: ctx => ` ${ctx.raw.toLocaleString()} ms` } } },
+    scales: {
+      x: { grid: { color: GRID_COLOR }, beginAtZero: true,
+           ticks: { callback: v => v >= 1000 ? (v/1000).toFixed(1)+'s' : v+'ms' } },
+      y: { grid: { color: GRID_COLOR }, ticks: { font: { size: 11 } } }
+    }
+  }
+});
+</script>
+{% endblock %}
