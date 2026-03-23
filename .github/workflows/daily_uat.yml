@@ -118,10 +118,13 @@ jobs:
         if: always()
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_ID: ${{ steps.trigger.outputs.run_id }}
+          FINAL: ${{ steps.wait.outputs.final_status }}
+          UAT_ENV: ${{ env.UAT_ENV }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
         run: |
-          RUN_ID=${{ steps.trigger.outputs.run_id }}
-          FINAL=${{ steps.wait.outputs.final_status }}
-
           python3 - <<'PYEOF'
           import json, os, urllib.request, urllib.error
 
@@ -212,13 +215,6 @@ jobs:
           except Exception as e:
             print(f"Slack notify failed: {e}")
           PYEOF
-        env:
-          RUN_ID: ${{ steps.trigger.outputs.run_id }}
-          FINAL: ${{ steps.wait.outputs.final_status }}
-          UAT_ENV: ${{ env.UAT_ENV }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
 
       # ── 12. Fail job if UAT errored ───────────────────────────────
       - name: Assert run succeeded
