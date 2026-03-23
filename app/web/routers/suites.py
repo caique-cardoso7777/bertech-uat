@@ -58,6 +58,39 @@ async def delete_suite_post(suite_id: int):
     return RedirectResponse("/suites", status_code=303)
 
 
+# ── API endpoints (JSON) ─────────────────────────────────────────────
+
+@router.get("/suites/api")
+async def list_suites_api():
+    conn = get_conn()
+    suites = list_suites(conn)
+    conn.close()
+    return suites
+
+
+@router.post("/suites/api")
+async def create_suite_api(name: str = Form(...), description: str = Form("")):
+    conn = get_conn()
+    suite_id = create_suite(conn, name, description)
+    conn.close()
+    return {"id": suite_id, "name": name}
+
+
+@router.post("/suites/{suite_id}/scenarios/api")
+async def add_scenario_api(
+    suite_id: int,
+    script_key: str = Form(...),
+    name: str = Form(""),
+    description: str = Form(""),
+):
+    conn = get_conn()
+    from ...scenarios.registry import REGISTRY_META
+    label = name or REGISTRY_META.get(script_key, {}).get("label", script_key)
+    add_scenario(conn, suite_id, label, script_key, description)
+    conn.close()
+    return {"suite_id": suite_id, "script_key": script_key, "label": label}
+
+
 # ── suite detail ─────────────────────────────────────────────────────
 
 @router.get("/suites/{suite_id}", response_class=HTMLResponse)
