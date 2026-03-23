@@ -48,40 +48,12 @@ jobs:
             sleep 2
           done
 
-      # ── 6. Get or create suite ID ─────────────────────────────────
-      - name: Resolve suite ID
+      # ── 6. Suite ID — always 1 (auto-seeded on app boot) ─────────────
+      - name: Set suite ID
         id: suite
         run: |
-          BASE="http://localhost:$UAT_PORT"
-
-          # look for existing suite
-          SUITES=$(curl -sf "$BASE/suites/api" 2>/dev/null || echo "[]")
-          SUITE_ID=$(echo "$SUITES" | python3 -c "
-          import sys, json
-          suites = json.load(sys.stdin)
-          match = next((s for s in suites if s['name'] == '$UAT_SUITE_NAME'), None)
-          print(match['id'] if match else '')
-          ")
-
-          # not found — create suite + add scenario
-          if [ -z "$SUITE_ID" ]; then
-            echo "Suite not found — creating '$UAT_SUITE_NAME'..."
-            CREATE=$(curl -sf -X POST "$BASE/suites/api" \
-              -d "name=$UAT_SUITE_NAME&description=Auto-created+by+CI" \
-              -H "Content-Type: application/x-www-form-urlencoded")
-            SUITE_ID=$(echo "$CREATE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
-            echo "Created suite #$SUITE_ID"
-
-            echo "Adding scenario buoy_champ_onboarding..."
-            curl -sf -X POST "$BASE/suites/$SUITE_ID/scenarios/api" \
-              -d "script_key=buoy_champ_onboarding" \
-              -H "Content-Type: application/x-www-form-urlencoded"
-            echo "Scenario added."
-          else
-            echo "Found suite #$SUITE_ID: $UAT_SUITE_NAME"
-          fi
-
-          echo "id=$SUITE_ID" >> $GITHUB_OUTPUT
+          echo "id=1" >> $GITHUB_OUTPUT
+          echo "Suite ID: 1 (Business Owner Onboarding)"
 
       # ── 7. Trigger the UAT run ────────────────────────────────────
       - name: Trigger UAT run

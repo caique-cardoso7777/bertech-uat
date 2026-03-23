@@ -122,6 +122,26 @@ def delete_suite(conn, suite_id: int) -> None:
     conn.commit()
 
 
+def ensure_default_suite(conn) -> int:
+    """Guarantee the Buoy-Champ suite exists. Returns the suite id (always 1)."""
+    row = fetch_one(conn, "SELECT id FROM suites WHERE id=1")
+    if row:
+        return row[0]
+    conn.execute(
+        "INSERT INTO suites(id, name, description) VALUES(1,?,?)",
+        (
+            "Business Owner Onboarding",
+            "Automated UAT — Buoy Champ full onboarding + enrollment flow",
+        ),
+    )
+    conn.execute(
+        "INSERT INTO scenarios(suite_id, name, script_key, order_idx) VALUES(1,?,?,0)",
+        ("Buoy Champ Onboarding", "buoy_champ_onboarding"),
+    )
+    conn.commit()
+    return 1
+
+
 # ── scenarios ────────────────────────────────────────────────────────
 
 def list_scenarios(conn, suite_id: int) -> List[Dict]:

@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .db import get_conn, migrate
+from .db import ensure_default_suite, get_conn, migrate
 from .web.routers import suites as suites_router
 from .web.routers import runs as runs_router
 from .web.routers import analytics as analytics_router
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 # ── DB startup ───────────────────────────────────────────────────────
 _conn = get_conn()
 migrate(_conn)
+ensure_default_suite(_conn)
 _conn.close()
 
 # ── app ──────────────────────────────────────────────────────────────
