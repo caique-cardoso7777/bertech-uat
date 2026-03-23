@@ -29,6 +29,12 @@ from .db import (
 from .scenarios.registry import get_scenario_func
 from .scenarios.buoy_champ_onboarding import _create_mailtm_account
 
+try:
+    from playwright_stealth import stealth_async as _stealth_async
+    _STEALTH_AVAILABLE = True
+except ImportError:
+    _STEALTH_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 SCREENSHOTS_DIR = Path(__file__).parent.parent / "reports" / "screenshots"
@@ -88,6 +94,12 @@ async def _run_one_user(
                 "--disable-infobars",
                 "--disable-dev-shm-usage",
                 "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--window-size=1440,900",
+                "--disable-extensions",
+                "--disable-plugins-discovery",
+                "--disable-default-apps",
+                "--lang=en-US,en",
             ],
         )
         ctx = await browser.new_context(
@@ -97,13 +109,28 @@ async def _run_one_user(
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/131.0.0.0 Safari/537.36"
             ),
+            locale="en-US",
+            timezone_id="America/New_York",
+            permissions=["geolocation"],
+            color_scheme="light",
         )
         ctx.set_default_timeout(env_config.get("timeout", 30_000))
-        await ctx.add_init_script(
-            "Object.defineProperty(navigator,'webdriver',{get:()=>undefined});"
-        )
+        # Anti-bot patches
+        await ctx.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+            Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3,4,5]});
+            Object.defineProperty(navigator, 'languages', {get: () => ['en-US','en']});
+            window.chrome = {runtime: {}};
+            Object.defineProperty(navigator, 'permissions', {
+                get: () => ({query: () => Promise.resolve({state: 'granted'})})
+            });
+        """)
 
         page = await ctx.new_page()
+
+        # Apply full playwright-stealth if available
+        if _STEALTH_AVAILABLE:
+            await _stealth_async(page)
 
         logger.info("user_start run_id=%s user=%s scenario=%s", run_id, user_idx, scenario_key)
         scenario_result = await scenario_func(page, user_config, user_idx)
