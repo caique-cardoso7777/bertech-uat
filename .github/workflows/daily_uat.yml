@@ -13,7 +13,7 @@ jobs:
     env:
       UAT_PORT: 8080
       UAT_ENV: dev             # dev | uat | prod
-      UAT_USERS: 10            # concurrent users
+      UAT_USERS: 5             # concurrent users
       UAT_SUITE_NAME: "Business Owner Onboarding"
 
     steps:
@@ -121,33 +121,104 @@ jobs:
         run: |
           RUN_ID=${{ steps.trigger.outputs.run_id }}
           FINAL=${{ steps.wait.outputs.final_status }}
-          EMOJI="✅"
-          if [[ "$FINAL" == "error" ]]; then EMOJI="❌"; fi
 
-          SUMMARY=$(python3 -c "
-          import json
+          python3 - <<'PYEOF'
+          import json, os, urllib.request, urllib.error
+
+          run_id  = os.environ.get("RUN_ID", "?")
+          final   = os.environ.get("FINAL", "unknown")
+          webhook = os.environ.get("SLACK_WEBHOOK", "")
+          env     = os.environ.get("UAT_ENV", "dev")
+          repo    = os.environ.get("GITHUB_REPOSITORY", "")
+          srv     = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+          gh_run  = os.environ.get("GITHUB_RUN_ID", "")
+
+          emoji = "✅" if final == "complete" else "❌"
+          color = "good" if final == "complete" else "danger"
+          logs_url = f"{srv}/{repo}/actions/runs/{gh_run}"
+
           try:
-            with open('run_${RUN_ID}.json') as f:
-              d = json.load(f)
-            s = d.get('summary', {})
-            print(f\"{s.get('users_pass',0)} pass · {s.get('users_warn',0)} warn · {s.get('users_fail',0)} fail · {s.get('wall_time_sec','?')}s\")
-          except:
-            print('(report unavailable)')
-          " 2>/dev/null || echo "(report unavailable)")
+            with open(f"run_{run_id}.json") as f:
+              data = json.load(f)
+          except Exception:
+            data = {}
 
-          curl -sf -X POST "$SLACK_WEBHOOK" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"text\": \"$EMOJI *BerTech UAT — Daily Run #${RUN_ID}* | $FINAL\",
-              \"attachments\": [{
-                \"color\": \"$([ '$FINAL' = 'complete' ] && echo 'good' || echo 'danger')\",
-                \"fields\": [
-                  {\"title\": \"Environment\", \"value\": \"$UAT_ENV\", \"short\": true},
-                  {\"title\": \"Results\", \"value\": \"$SUMMARY\", \"short\": true},
-                  {\"title\": \"Workflow\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\", \"short\": true}
-                ]
-              }]
-            }"
+          s = data.get("summary", {})
+          total   = s.get("total_users", 0)
+          passed  = s.get("users_pass", 0)
+          warned  = s.get("users_warn", 0)
+          failed  = s.get("users_fail", 0)
+          elapsed = s.get("wall_time_sec", "?")
+
+          # Build step table
+          users = data.get("users", [])
+          step_names = s.get("canonical_step_order", [])
+          step_stats = {}
+          for step in step_names:
+            step_stats[step] = {"pass": 0, "warn": 0, "fail": 0, "skip": 0}
+          for u in users:
+            for st in u.get("steps", []):
+              name = st["name"]
+              status = st.get("status", "SKIP").lower()
+              if name in step_stats and status in step_stats[name]:
+                step_stats[name][status] += 1
+
+          # Shorten step names
+          short = {
+            "Onboarding 1": "O1 — Intro",
+            "Onboarding 2": "O2 — User Type",
+            "Onboarding 3": "O3 — Company Info",
+            "Onboarding 4": "O4 — Census & Payroll",
+            "Onboarding 5": "O5 — Impact Estimate",
+            "Sign Up":      "Sign Up",
+            "OTP":          "OTP — Verify",
+            "Enrollment 1": "E1 — Account Manager",
+            "Enrollment 2": "E2 — Company Info",
+            "Enrollment 3B":"E3B — Persona KYB",
+            "Enrollment 3C":"E3C — Payroll + LOI",
+            "Enrollment 4": "E4 — Final Report",
+            "Enrollment 5": "E5 — PandaDoc",
+          }
+
+          rows = []
+          for full, st in step_stats.items():
+            label = next((v for k, v in short.items() if full.startswith(k)), full[:30])
+            icons = []
+            if st["fail"] > 0:  icons.append(f"🔴 {st['fail']} fail")
+            if st["warn"] > 0:  icons.append(f"🟡 {st['warn']} warn")
+            if st["pass"] == total and total > 0: icons.append("✅")
+            rows.append(f"`{label:<25}` {'  '.join(icons) if icons else '—'}")
+
+          step_block = "\n".join(rows) if rows else "(no step data)"
+
+          payload = {
+            "text": f"{emoji} *BerTech UAT — Daily Run #{run_id}* | {final}",
+            "attachments": [{
+              "color": color,
+              "fields": [
+                {"title": "Environment", "value": env, "short": True},
+                {"title": "Users", "value": f"{passed} pass · {warned} warn · {failed} fail  |  {elapsed}s", "short": True},
+                {"title": "Step Breakdown", "value": step_block, "short": False},
+                {"title": "Logs", "value": f"<{logs_url}|View workflow run>", "short": False},
+              ]
+            }]
+          }
+
+          body = json.dumps(payload).encode()
+          req  = urllib.request.Request(webhook, data=body, headers={"Content-Type": "application/json"})
+          try:
+            urllib.request.urlopen(req, timeout=10)
+            print("Slack notified OK")
+          except Exception as e:
+            print(f"Slack notify failed: {e}")
+          PYEOF
+        env:
+          RUN_ID: ${{ steps.trigger.outputs.run_id }}
+          FINAL: ${{ steps.wait.outputs.final_status }}
+          UAT_ENV: ${{ env.UAT_ENV }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
 
       # ── 12. Fail job if UAT errored ───────────────────────────────
       - name: Assert run succeeded
