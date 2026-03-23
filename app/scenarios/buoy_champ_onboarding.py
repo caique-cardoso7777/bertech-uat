@@ -1331,8 +1331,8 @@ async def run(page: Page, config: dict, user_idx: int) -> dict:
             notes.append("B18: No premature validation errors")
 
         # "Verify My Identity" — div.css-c5592h
-        await page.locator("div.css-c5592h").first.click()
-        await page.wait_for_timeout(3500)
+        await page.locator("div.css-c5592h").first.click(timeout=60000)
+        await page.wait_for_timeout(5000)
 
         # Dismiss intro X button if present
         try:
@@ -1345,8 +1345,8 @@ async def run(page: Page, config: dict, user_idx: int) -> dict:
         pf = page.frame_locator('iframe[src*="withpersona.com"]')
 
         # "Begin verifying" / "Iniciar Verificação"
-        await pf.locator("[data-test='button__children']").first.click()
-        await page.wait_for_timeout(2000)
+        await pf.locator("[data-test='button__children']").first.click(timeout=60000)
+        await page.wait_for_timeout(3000)
 
         # Legal business name — div:nth-of-type(1) > [data-test='form']
         await pf.locator("div:nth-of-type(1) > [data-test='form']").fill(
@@ -1739,7 +1739,7 @@ async def run(page: Page, config: dict, user_idx: int) -> dict:
         ]
         _rts_found_sel = None
         _rts_js_handle = None  # for JS-clicked non-standard elements
-        for _poll_i in range(18):  # 18 × 5s = 90s max
+        for _poll_i in range(24):  # 24 × 5s = 120s max
             await page.evaluate("() => window.scrollTo(0, document.body.scrollHeight)")
             await page.wait_for_timeout(5000)
 
@@ -1817,9 +1817,9 @@ async def run(page: Page, config: dict, user_idx: int) -> dict:
         panda_page = None
         try:
             if not _rts_found_sel and not _rts_js_handle:
-                raise Exception("'Ready To Sign' button not found after 90s polling")
+                raise Exception("'Ready To Sign' button not found after 120s polling")
 
-            async with page.context.expect_page(timeout=30000) as new_page_info:
+            async with page.context.expect_page(timeout=60000) as new_page_info:
                 if _rts_found_sel:
                     # When we matched a broad selector (e.g. div:has-text),
                     # find the innermost specific element to click via JS,
