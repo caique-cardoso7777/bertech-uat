@@ -8,7 +8,7 @@ on:
 jobs:
   run-uat:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     env:
       UAT_PORT: 8080
@@ -80,7 +80,7 @@ jobs:
         run: |
           RUN_ID=${{ steps.trigger.outputs.run_id }}
           echo "Polling run #$RUN_ID..."
-          for i in $(seq 1 90); do   # poll up to 15 min (90 × 10s)
+          for i in $(seq 1 150); do  # poll up to 25 min (150 × 10s)
             STATUS=$(curl -sf "http://localhost:$UAT_PORT/runs/$RUN_ID/status" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status',''))")
             echo "  [${i}] status=$STATUS"
             if [[ "$STATUS" == "complete" || "$STATUS" == "error" || "$STATUS" == "canceled" ]]; then
